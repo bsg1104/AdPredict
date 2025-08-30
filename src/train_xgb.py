@@ -80,6 +80,13 @@ def train_xgb(X_train: pd.DataFrame, X_val: pd.DataFrame, X_test: pd.DataFrame, 
         import xgboost as xgb
     except Exception as e:
         raise RuntimeError("xgboost is required to run this script. Install with `pip install xgboost`") from e
+    # optionally import mlflow for logging
+    try:
+        import mlflow
+        MLFLOW = True
+    except Exception:
+        mlflow = None
+        MLFLOW = False
 
     dtrain = xgb.DMatrix(X_train.values, label=y_train)
     dval = xgb.DMatrix(X_val.values, label=y_val)
@@ -132,6 +139,19 @@ def train_xgb(X_train: pd.DataFrame, X_val: pd.DataFrame, X_test: pd.DataFrame, 
     # save model
     model_path = os.path.join(out_dir, "models", f"xgb_{ts}.json")
     bst.save_model(model_path)
+
+    # MLflow logging (best-effort)
+    if MLFLOW:
+        try:
+            mlflow.start_run(run_name=f"xgb_{ts}")
+            mlflow.log_params(params)
+            mlflow.log_metric('auc_test', auc)
+            mlflow.log_metric('ap_test', ap)
+            mlflow.log_artifact(metrics_path, artifact_path='metrics')
+            mlflow.log_artifact(model_path, artifact_path='models')
+            mlflow.end_run()
+        except Exception:
+            pass
 
     # plots
     fpr, tpr, _ = roc_curve(y_test, probs)

@@ -63,7 +63,28 @@ def _run_single(cfg, args, ts):
         "verbosity": 0,
     }
 
+    # try to use MLflow for run-level tracking if available
+    try:
+        import mlflow
+        mlflow.start_run(run_name=label)
+        mlflow.log_params(cfg)
+        mlflow.log_params(params)
+        mlflow_run = True
+    except Exception:
+        mlflow = None
+        mlflow_run = False
+
     metrics, model_path = train_xgb_module.train_xgb(X_train, X_val, X_test, y_train, y_val, y_test, params, num_boost_round=cfg["num_boost_round"], early_stopping_rounds=args.early_stopping_rounds, out_dir=run_dir)
+
+    if mlflow_run:
+        try:
+            mlflow.log_metric('auc_test', metrics.get('auc_test'))
+            mlflow.log_metric('ap_test', metrics.get('ap_test'))
+            mlflow.log_artifact(os.path.join(run_dir, 'metrics', os.listdir(os.path.join(run_dir, 'metrics'))[0]), artifact_path='metrics')
+            mlflow.log_artifact(model_path, artifact_path='models')
+            mlflow.end_run()
+        except Exception:
+            pass
 
     rec = {"label": label, "eta": cfg["eta"], "max_depth": cfg["max_depth"], "num_boost_round": cfg["num_boost_round"], "auc_test": metrics.get("auc_test"), "ap_test": metrics.get("ap_test"), "model_path": model_path}
     # write per-run metadata

@@ -42,6 +42,12 @@ append-eval:
 explain-shap:
 	. .venv/bin/activate && pip install shap xgboost && python -m src.explain_shap --model $(shell ls outputs/xgb_sweep_full/*/models/xgb_*.json | head -n1) --out_dir outputs/shap
 
+serve:
+	. .venv/bin/activate && uvicorn src.predict_api:app --host 127.0.0.1 --port 8000
+
+docker-build:
+	docker build -t adpredict:latest .
+
 test:
 	. .venv/bin/activate && pip install pytest && pytest -q
 

@@ -141,6 +141,17 @@ def run(args: argparse.Namespace) -> int:
     clf = SGDClassifier(loss="log_loss", max_iter=args.max_iter, tol=args.tol, random_state=args.random_state)
     clf.fit(X_train, y_train)
 
+    # optional mlflow logging
+    try:
+        import mlflow
+        mlflow.start_run(run_name=f"lr_{ts}")
+        mlflow.log_param('n_features', args.n_features)
+        mlflow.log_metric('auc_test', auc_test)
+        mlflow.log_metric('ap_test', ap_test)
+        mlflow.end_run()
+    except Exception:
+        pass
+
     # predict probabilities (use decision_function + sigmoid if predict_proba unavailable)
     def get_probs(model, X):
         if hasattr(model, "predict_proba"):
