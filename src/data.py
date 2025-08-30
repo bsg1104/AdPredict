@@ -60,6 +60,60 @@ def generate_sample_csv(path: str, nrows: int = 10000, seed: int = 42) -> pd.Dat
     return df
 
 
+def generate_injected_criteo(path: str, nrows: int = 10000, seed: int = 42, inject_cols=None, signal_strength: float = 1.0) -> pd.DataFrame:
+    """Generate a Criteo-like TSV with an injected predictive signal.
+
+    The output is a headerless TSV matching columns expected by
+    `load_criteo_csv`: label, I1..I13, C1..C26. Injection is added to a
+    small set of columns (categorical or integer) to make FE experiments
+    reproducible during development.
+    """
+    np.random.seed(seed)
+
+    if inject_cols is None:
+        inject_cols = ["C1", "C2", "I1"]
+
+    # integer features I1..I13
+    int_cols = [f"I{i}" for i in range(1, 14)]
+    X_int = {c: np.random.poisson(lam=2 + (i % 3), size=nrows) for i, c in enumerate(int_cols)}
+
+    # categorical features C1..C26 with moderate cardinality
+    cat_cols = [f"C{i}" for i in range(1, 27)]
+    categories = [f"cat_{j}" for j in range(50)]
+    X_cat = {c: np.random.choice(categories, size=nrows) for c in cat_cols}
+
+    # build dataframe
+    df = pd.DataFrame({**X_int, **X_cat})
+
+    # create a base score and then inject signal from chosen cols
+    score = np.zeros(nrows, dtype=float)
+    for c in inject_cols:
+        if c in int_cols:
+            score += signal_strength * (df[c] > df[c].mean()).astype(float)
+        elif c in cat_cols:
+            # make certain categories positively predictive
+            top = df[c].value_counts().index[:3].tolist()
+            score += signal_strength * df[c].isin(top).astype(float)
+
+    # convert score to probability and sample labels
+    probs = 1 / (1 + np.exp(-(score - 0.5)))
+    labels = np.random.binomial(1, probs)
+
+    # final TSV requires label first
+    cols = ["label"] + int_cols + cat_cols
+    out_df = pd.DataFrame(columns=cols)
+    out_df["label"] = labels
+    for c in int_cols:
+        out_df[c] = df[c]
+    for c in cat_cols:
+        out_df[c] = df[c]
+
+    os.makedirs(os.path.dirname(path), exist_ok=True)
+    # write as TSV without header to match load_criteo_csv expectations
+    out_df.to_csv(path, sep="\t", header=False, index=False)
+    return out_df
+
+
 def load_criteo_csv(path: str, sample_frac: float = None, nrows: int = None, seed: int = 42) -> pd.DataFrame:
     """Load a Criteo-format TSV into a DataFrame with columns:
     label, I1..I13, C1..C26.
