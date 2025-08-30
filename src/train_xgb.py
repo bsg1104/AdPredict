@@ -199,6 +199,11 @@ def main():
 
     # fit FE for dense engineered features
     fe = fit_fe(train_df, label_col=label_col, top_k_te=args.top_k_te, smoothing=args.smoothing, n_bins=args.n_bins)
+    # persist FE for later serving
+    try:
+        joblib.dump(fe, os.path.join(args.out_dir, 'fe.joblib'))
+    except Exception:
+        pass
 
     X_train, X_val, X_test, y_train, y_val, y_test = build_matrix(train_df, val_df, test_df, fe=fe)
 

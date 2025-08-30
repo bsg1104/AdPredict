@@ -17,6 +17,7 @@ from datetime import datetime
 from typing import List
 
 import pandas as pd
+import joblib
 
 from src.data import load_criteo_csv, split_df
 from src.feature_engineering import fit_fe
@@ -46,6 +47,11 @@ def _run_single(cfg, args, ts):
     train_df, val_df, test_df = split_df(df, stratify_col=label_col, train_frac=args.train_frac, val_frac=args.val_frac, test_frac=args.test_frac, random_state=args.random_state)
 
     fe = fit_fe(train_df, label_col=label_col, top_k_te=args.top_k_te, smoothing=args.smoothing, n_bins=args.n_bins)
+    # persist FE so serving code can load it later
+    try:
+        joblib.dump(fe, os.path.join(run_dir, 'fe.joblib'))
+    except Exception:
+        pass
     X_train, X_val, X_test, y_train, y_val, y_test = train_xgb_module.build_matrix(train_df, val_df, test_df, fe=fe)
 
     params = {

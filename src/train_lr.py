@@ -30,6 +30,7 @@ from sklearn.preprocessing import QuantileTransformer
 from sklearn.feature_extraction import FeatureHasher
 
 from src.data import load_criteo_csv, split_df
+from src.feature_engineering import fit_fe
 
 
 INT_COLS = [f"I{i}" for i in range(1, 14)]
@@ -109,6 +110,13 @@ def run(args: argparse.Namespace) -> int:
     # Quantile-transform integer features
     print("Fitting quantile transformer on integer features...")
     X_train_int, X_val_int, X_test_int = _quantile_transform(train_df, [train_df, val_df, test_df])
+
+    # fit and save FE for parity (optional)
+    try:
+        fe = fit_fe(train_df, label_col=label_col)
+        joblib.dump(fe, os.path.join(args.out_dir, 'fe.joblib'))
+    except Exception:
+        fe = None
 
     # Hash categorical features
     print(f"Hashing categorical features into {args.n_features} dims (may be large)...")
